@@ -1,5 +1,5 @@
 # The lab's shared Julia CI. Packages call it from a copy of templates/CI.yml:
-#   uses: LidkeLab/.github/.github/workflows/julia-ci.yml@v1
+#   uses: LidkeLab/.github/.github/workflows/julia-ci.yml@v2
 # It runs the Core test group at the oldest supported Julia and the current release, the QA
 # group, and (registered packages) the lowest dependency versions the [compat] bounds allow.
 # Heavy groups (GPU, Data, Long, Hardware) never run here; they run on a lab machine.
@@ -23,12 +23,23 @@ on:
 
 permissions: {}
 
+env:
+  # Precompile for the same CPU targets as the official Julia binaries. The default, native,
+  # ties every cached pkgimage to the CPU of the job that saved the cache; GitHub's x64 runners
+  # mix AMD EPYC 7763, 9V74 and Intel Xeon 8370C, 8573C, and a job landing on an incompatible
+  # one rejects the cache ("different system or CPU target") and rebuilds every dependency.
+  JULIA_CPU_TARGET: 'generic;sandybridge,-xsaveopt,clone_all;haswell,-rdrnd,base(1);x86-64-v4,-rdrnd,base(1)'
+  # Only the default branch saves Julia caches; PR and other branch runs restore the default
+  # branch's cache and save nothing, so they cannot evict it from the 10 GB repository budget.
+  # Scheduled runs always run on the default branch.
+  JULIA_CACHE_SAVE: ${{ github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+
 jobs:
   test:
     name: Core - Julia ${{ matrix.version }}
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60  # a cold portable-target build of a large package runs ~30 min
     permissions:
       actions: write  # julia-actions/cache deletes the caches it replaces
       contents: read
@@ -48,6 +59,10 @@ jobs:
           arch: x64
           project: ${{ inputs.project }}
       - uses: julia-actions/cache@v3
+        with:
+          cache-name: julia-cache;workflow=${{ github.workflow }};job=${{ github.job }};cpu=portable
+          save-always: ${{ env.JULIA_CACHE_SAVE }}
+          _job-status: ${{ env.JULIA_CACHE_SAVE == 'true' && job.status || 'not-saved-off-default-branch' }}
       - uses: julia-actions/julia-buildpkg@v1
         with:
           project: ${{ inputs.project }}
@@ -60,7 +75,7 @@ jobs:
     name: QA
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60  # a cold portable-target build of a large package runs ~30 min
     permissions:
       actions: write
       contents: read
@@ -75,6 +90,10 @@ jobs:
           version: '1'
           arch: x64
       - uses: julia-actions/cache@v3
+        with:
+          cache-name: julia-cache;workflow=${{ github.workflow }};job=${{ github.job }};cpu=portable
+          save-always: ${{ env.JULIA_CACHE_SAVE }}
+          _job-status: ${{ env.JULIA_CACHE_SAVE == 'true' && job.status || 'not-saved-off-default-branch' }}
       - uses: julia-actions/julia-buildpkg@v1
         with:
           project: ${{ inputs.project }}
@@ -90,7 +109,7 @@ jobs:
     name: Core - lowest compat
     if: inputs.registered && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60  # a cold portable-target build of a large package runs ~30 min
     permissions:
       actions: write
       contents: read
@@ -106,6 +125,10 @@ jobs:
           arch: x64
           project: ${{ inputs.project }}
       - uses: julia-actions/cache@v3
+        with:
+          cache-name: julia-cache;workflow=${{ github.workflow }};job=${{ github.job }};cpu=portable
+          save-always: ${{ env.JULIA_CACHE_SAVE }}
+          _job-status: ${{ env.JULIA_CACHE_SAVE == 'true' && job.status || 'not-saved-off-default-branch' }}
       - uses: julia-actions/julia-downgrade-compat@v2
         with:
           projects: ${{ inputs.project }}
@@ -125,7 +148,7 @@ jobs:
     name: Core - Julia pre
     if: inputs.registered && github.event_name == 'schedule'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60  # a cold portable-target build of a large package runs ~30 min
     continue-on-error: true
     permissions:
       actions: write
@@ -141,6 +164,10 @@ jobs:
           version: pre
           arch: x64
       - uses: julia-actions/cache@v3
+        with:
+          cache-name: julia-cache;workflow=${{ github.workflow }};job=${{ github.job }};cpu=portable
+          save-always: ${{ env.JULIA_CACHE_SAVE }}
+          _job-status: ${{ env.JULIA_CACHE_SAVE == 'true' && job.status || 'not-saved-off-default-branch' }}
       - uses: julia-actions/julia-buildpkg@v1
         with:
           project: ${{ inputs.project }}
@@ -153,7 +180,7 @@ jobs:
     name: Runic
     if: inputs.runic && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60  # a cold portable-target build of a large package runs ~30 min
     permissions:
       contents: read
     steps:
@@ -166,7 +193,12 @@ jobs:
           arch: x64
       - uses: julia-actions/cache@v3
         with:
-          delete-old-caches: 'false'  # needs actions: write, which this job does not get
+          cache-name: julia-cache;workflow=${{ github.workflow }};job=${{ github.job }};cpu=portable
+          save-always: ${{ env.JULIA_CACHE_SAVE }}
+          _job-status: ${{ env.JULIA_CACHE_SAVE == 'true' && job.status || 'not-saved-off-default-branch' }}
+          # Off the default branch nothing is saved (JULIA_CACHE_SAVE); on it, julia-actions/cache
+          # never deletes old caches, so deletion would need actions: write for nothing.
+          delete-old-caches: 'false'
       - uses: fredrikekre/runic-action@v1
         with:
           version: '1'
