@@ -11,8 +11,12 @@ const PKGROOT = dirname(TESTDIR)
 const CFG = TOML.parsefile(joinpath(TESTDIR, "test_groups.toml"))
 
 folder(g) = g == "Core" ? TESTDIR : joinpath(TESTDIR, lowercase(g))
-testfiles(g) = sort([joinpath(folder(g), f) for f in readdir(folder(g))
-                     if endswith(f, ".jl") && f != "runtests.jl" && isfile(joinpath(folder(g), f))])
+testfiles(g) = sort(
+    [
+        joinpath(folder(g), f) for f in readdir(folder(g))
+            if endswith(f, ".jl") && f != "runtests.jl" && isfile(joinpath(folder(g), f))
+    ]
+)
 
 # Layout check: a test file must never silently not run.
 for g in keys(CFG)
@@ -52,20 +56,20 @@ function with_group_env(f, g)
     (g != "Core" && isfile(proj)) || return f()
     prev, tmp = Base.active_project(), mktempdir()
     cp(proj, joinpath(tmp, "Project.toml"))
-    Pkg.activate(tmp; io=devnull)
+    Pkg.activate(tmp; io = devnull)
     try
-        Pkg.develop(Pkg.PackageSpec(path=PKGROOT); io=devnull)
-        Pkg.instantiate(; io=devnull)
+        Pkg.develop(Pkg.PackageSpec(path = PKGROOT); io = devnull)
+        Pkg.instantiate(; io = devnull)
         return f()
     finally
-        Pkg.activate(prev; io=devnull)
+        Pkg.activate(prev; io = devnull)
     end
 end
 
 function counts(ts)
     c = Test.get_test_counts(ts)  # a Tuple before Julia 1.11, a TestCounts after
-    c isa Tuple ? (pass=c[1] + c[5], fail=0, error=0, broken=c[4] + c[8]) :
-        (pass=c.passes + c.cumulative_passes, fail=0, error=0, broken=c.broken + c.cumulative_broken)
+    return c isa Tuple ? (pass = c[1] + c[5], fail = 0, error = 0, broken = c[4] + c[8]) :
+        (pass = c.passes + c.cumulative_passes, fail = 0, error = 0, broken = c.broken + c.cumulative_broken)
 end
 
 # Runs group g: each file in its own module (like SafeTestsets) and its own @testset.
@@ -74,23 +78,33 @@ function rungroup(g)
     return with_group_env(g) do
         reason = unmet(g)
         reason === nothing ||
-            return Dict{String,Any}("ran" => false, "passed" => false, "reason" => reason)
-        printstyled("GROUP $g\n"; bold=true)
+            return Dict{String, Any}("ran" => false, "passed" => false, "reason" => reason)
+        printstyled("GROUP $g\n"; bold = true)
         c = try
-            counts(@testset "$g" begin
-                for f in testfiles(g)
-                    @testset "$(relpath(f, TESTDIR))" begin
-                        Core.eval(Main, :(module $(gensym(:testfile)) include($f) end))
+            counts(
+                @testset "$g" begin
+                    for f in testfiles(g)
+                        @testset "$(relpath(f, TESTDIR))" begin
+                            Core.eval(
+                                Main, :(
+                                    module $(gensym(:testfile))
+                                    include($f)
+                                    end
+                                )
+                            )
+                        end
                     end
                 end
-            end)
+            )
         catch e
             e isa Test.TestSetException || rethrow()
-            (pass=e.pass, fail=e.fail, error=e.error, broken=e.broken)
+            (pass = e.pass, fail = e.fail, error = e.error, broken = e.broken)
         end
-        Dict{String,Any}("ran" => true, "passed" => c.fail + c.error == 0, "pass" => c.pass,
+        Dict{String, Any}(
+            "ran" => true, "passed" => c.fail + c.error == 0, "pass" => c.pass,
             "fail" => c.fail, "error" => c.error, "broken" => c.broken,
-            "seconds" => round(time() - t0; digits=1))
+            "seconds" => round(time() - t0; digits = 1)
+        )
     end
 end
 
@@ -102,7 +116,7 @@ for g in wanted
     haskey(CFG, g) || error("GROUP=$sel: $g is not declared in test_groups.toml")
 end
 
-results = Dict{String,Any}()
+results = Dict{String, Any}()
 for g in GROUPS
     g in wanted || continue
     results[g] = rungroup(g)
@@ -112,8 +126,12 @@ end
 
 if haskey(ENV, "LAB_TEST_SUMMARY")
     open(ENV["LAB_TEST_SUMMARY"], "w") do io
-        TOML.print(io, Dict("julia" => string(VERSION), "host" => first(split(gethostname(), '.')),
-                            "selection" => sel, "groups" => results); sorted=true)
+        TOML.print(
+            io, Dict(
+                "julia" => string(VERSION), "host" => first(split(gethostname(), '.')),
+                "selection" => sel, "groups" => results
+            ); sorted = true
+        )
     end
 end
 bad = [g for (g, r) in results if r["ran"] ? !r["passed"] : explicit]

@@ -58,5 +58,6 @@ move to it by editing their caller.
 
 ## Self-test
 
-`.github/workflows/selftest.yml` runs the workflow from the same commit against a small fixture
-package in `test/fixture/FixturePkg`, on every push and pull request.
+`.github/workflows/selftest.yml` runs the workflow from the same commit, with `registered` and
+`runic` on, against a small fixture package in `test/fixture/FixturePkg`, on every push and pull
+request.
