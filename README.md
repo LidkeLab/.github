@@ -17,7 +17,7 @@ that need a GPU, lab data, long run times or an instrument run on a lab machine 
 |---|---|---|
 | `test` | always | `GROUP=Core` tests at Julia `min` (the `julia` compat lower bound) and `1` |
 | `qa` | always | `GROUP=QA` tests (Aqua, ExplicitImports) at Julia `1` |
-| `downgrade` | `registered: true` | `GROUP=Core` with direct dependencies at the lowest versions `[compat]` allows |
+| `downgrade` | `registered: true` | `GROUP=Core` at Julia `min`, the oldest supported Julia, with direct dependencies at the lowest versions `[compat]` allows |
 | `pre` | `registered: true`, scheduled runs only | `GROUP=Core` at the Julia prerelease; allowed to fail |
 | `format` | `runic: true` | Runic formatting check |
 
@@ -51,9 +51,9 @@ or `.claude/` do not start a run. A newer push to a pull request cancels the old
 
 ## Versions
 
-Callers use `@v1`. The `v1` tag is moved forward only for backward-compatible changes: a new input
+Callers use `@v2`. The `v2` tag is moved forward only for backward-compatible changes: a new input
 with a default that keeps the old behaviour, an updated action version, a fix. A change that could
-turn a passing package red, or that removes or renames an input, is released as `v2`, and packages
+turn a passing package red, or that removes or renames an input, is released as `v3`, and packages
 move to it by editing their caller.
 
 ## Self-test
