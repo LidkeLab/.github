@@ -39,7 +39,7 @@ jobs:
     name: Core - Julia ${{ matrix.version }}
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60  # a cold portable-target build of a large package runs ~30 min
     permissions:
       actions: write  # julia-actions/cache deletes the caches it replaces
       contents: read
@@ -75,7 +75,7 @@ jobs:
     name: QA
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60  # a cold portable-target build of a large package runs ~30 min
     permissions:
       actions: write
       contents: read
@@ -109,7 +109,7 @@ jobs:
     name: Core - lowest compat
     if: inputs.registered && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60  # a cold portable-target build of a large package runs ~30 min
     permissions:
       actions: write
       contents: read
@@ -148,7 +148,7 @@ jobs:
     name: Core - Julia pre
     if: inputs.registered && github.event_name == 'schedule'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60  # a cold portable-target build of a large package runs ~30 min
     continue-on-error: true
     permissions:
       actions: write
@@ -196,7 +196,9 @@ jobs:
           cache-name: julia-cache;workflow=${{ github.workflow }};job=${{ github.job }};cpu=portable
           save-always: ${{ env.JULIA_CACHE_SAVE }}
           _job-status: ${{ env.JULIA_CACHE_SAVE == 'true' && job.status || 'not-saved-off-default-branch' }}
-          delete-old-caches: 'false'  # needs actions: write, which this job does not get
+          # Off the default branch nothing is saved (JULIA_CACHE_SAVE); on it, julia-actions/cache
+          # never deletes old caches, so deletion would need actions: write for nothing.
+          delete-old-caches: 'false'
       - uses: fredrikekre/runic-action@v1
         with:
           version: '1'
