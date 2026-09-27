@@ -1,5 +1,5 @@
 # The lab's shared Julia CI. Packages call it from a copy of templates/CI.yml:
-#   uses: LidkeLab/.github/.github/workflows/julia-ci.yml@v1
+#   uses: LidkeLab/.github/.github/workflows/julia-ci.yml@v2
 # It runs the Core test group at the oldest supported Julia and the current release, the QA
 # group, and (registered packages) the lowest dependency versions the [compat] bounds allow.
 # Heavy groups (GPU, Data, Long, Hardware) never run here; they run on a lab machine.
