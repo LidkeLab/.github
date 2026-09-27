@@ -23,6 +23,13 @@ on:
 
 permissions: {}
 
+env:
+  # Precompile for the same CPU targets as the official Julia binaries. The default, native,
+  # ties every cached pkgimage to the CPU of the job that saved the cache; GitHub's x64 runners
+  # mix AMD EPYC 7763, 9V74 and Intel Xeon 8370C, 8573C, and a job landing on an incompatible
+  # one rejects the cache ("different system or CPU target") and rebuilds every dependency.
+  JULIA_CPU_TARGET: 'generic;sandybridge,-xsaveopt,clone_all;haswell,-rdrnd,base(1);x86-64-v4,-rdrnd,base(1)'
+
 jobs:
   test:
     name: Core - Julia ${{ matrix.version }}
@@ -48,6 +55,8 @@ jobs:
           arch: x64
           project: ${{ inputs.project }}
       - uses: julia-actions/cache@v3
+        with:
+          cache-name: julia-cache;workflow=${{ github.workflow }};job=${{ github.job }};cpu=portable
       - uses: julia-actions/julia-buildpkg@v1
         with:
           project: ${{ inputs.project }}
@@ -75,6 +84,8 @@ jobs:
           version: '1'
           arch: x64
       - uses: julia-actions/cache@v3
+        with:
+          cache-name: julia-cache;workflow=${{ github.workflow }};job=${{ github.job }};cpu=portable
       - uses: julia-actions/julia-buildpkg@v1
         with:
           project: ${{ inputs.project }}
@@ -106,6 +117,8 @@ jobs:
           arch: x64
           project: ${{ inputs.project }}
       - uses: julia-actions/cache@v3
+        with:
+          cache-name: julia-cache;workflow=${{ github.workflow }};job=${{ github.job }};cpu=portable
       - uses: julia-actions/julia-downgrade-compat@v2
         with:
           projects: ${{ inputs.project }}
@@ -141,6 +154,8 @@ jobs:
           version: pre
           arch: x64
       - uses: julia-actions/cache@v3
+        with:
+          cache-name: julia-cache;workflow=${{ github.workflow }};job=${{ github.job }};cpu=portable
       - uses: julia-actions/julia-buildpkg@v1
         with:
           project: ${{ inputs.project }}
@@ -166,6 +181,7 @@ jobs:
           arch: x64
       - uses: julia-actions/cache@v3
         with:
+          cache-name: julia-cache;workflow=${{ github.workflow }};job=${{ github.job }};cpu=portable
           delete-old-caches: 'false'  # needs actions: write, which this job does not get
       - uses: fredrikekre/runic-action@v1
         with:
