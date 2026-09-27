@@ -23,6 +23,12 @@ on:
 
 permissions: {}
 
+env:
+  # Only the default branch saves Julia caches; PR and other branch runs restore the default
+  # branch's cache and save nothing, so they cannot evict it from the 10 GB repository budget.
+  # Scheduled runs always run on the default branch.
+  JULIA_CACHE_SAVE: ${{ github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+
 jobs:
   test:
     name: Core - Julia ${{ matrix.version }}
@@ -48,6 +54,9 @@ jobs:
           arch: x64
           project: ${{ inputs.project }}
       - uses: julia-actions/cache@v3
+        with:
+          save-always: ${{ env.JULIA_CACHE_SAVE }}
+          _job-status: ${{ env.JULIA_CACHE_SAVE == 'true' && job.status || 'not-saved-off-default-branch' }}
       - uses: julia-actions/julia-buildpkg@v1
         with:
           project: ${{ inputs.project }}
@@ -75,6 +84,9 @@ jobs:
           version: '1'
           arch: x64
       - uses: julia-actions/cache@v3
+        with:
+          save-always: ${{ env.JULIA_CACHE_SAVE }}
+          _job-status: ${{ env.JULIA_CACHE_SAVE == 'true' && job.status || 'not-saved-off-default-branch' }}
       - uses: julia-actions/julia-buildpkg@v1
         with:
           project: ${{ inputs.project }}
@@ -106,6 +118,9 @@ jobs:
           arch: x64
           project: ${{ inputs.project }}
       - uses: julia-actions/cache@v3
+        with:
+          save-always: ${{ env.JULIA_CACHE_SAVE }}
+          _job-status: ${{ env.JULIA_CACHE_SAVE == 'true' && job.status || 'not-saved-off-default-branch' }}
       - uses: julia-actions/julia-downgrade-compat@v2
         with:
           projects: ${{ inputs.project }}
@@ -141,6 +156,9 @@ jobs:
           version: pre
           arch: x64
       - uses: julia-actions/cache@v3
+        with:
+          save-always: ${{ env.JULIA_CACHE_SAVE }}
+          _job-status: ${{ env.JULIA_CACHE_SAVE == 'true' && job.status || 'not-saved-off-default-branch' }}
       - uses: julia-actions/julia-buildpkg@v1
         with:
           project: ${{ inputs.project }}
@@ -166,6 +184,8 @@ jobs:
           arch: x64
       - uses: julia-actions/cache@v3
         with:
+          save-always: ${{ env.JULIA_CACHE_SAVE }}
+          _job-status: ${{ env.JULIA_CACHE_SAVE == 'true' && job.status || 'not-saved-off-default-branch' }}
           delete-old-caches: 'false'  # needs actions: write, which this job does not get
       - uses: fredrikekre/runic-action@v1
         with:
