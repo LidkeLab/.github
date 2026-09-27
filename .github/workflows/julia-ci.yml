@@ -1,0 +1,171 @@
+# The lab's shared Julia CI. Packages call it from a copy of templates/CI.yml:
+#   uses: LidkeLab/.github/.github/workflows/julia-ci.yml@v1
+# It runs the Core test group at the oldest supported Julia and the current release, the QA
+# group, and (registered packages) the lowest dependency versions the [compat] bounds allow.
+# Heavy groups (GPU, Data, Long, Hardware) never run here; they run on a lab machine.
+name: Julia CI
+
+on:
+  workflow_call:
+    inputs:
+      registered:
+        description: 'The package is registered: adds the downgrade job and the monthly Julia pre run.'
+        type: boolean
+        default: false
+      runic:
+        description: 'Check formatting with Runic.'
+        type: boolean
+        default: false
+      project:
+        description: 'Path to the package, relative to the repository root.'
+        type: string
+        default: '.'
+
+permissions: {}
+
+jobs:
+  test:
+    name: Core - Julia ${{ matrix.version }}
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: write  # julia-actions/cache deletes the caches it replaces
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['min', '1']
+    env:
+      GROUP: Core
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: ${{ matrix.version }}
+          arch: x64
+          project: ${{ inputs.project }}
+      - uses: julia-actions/cache@v3
+      - uses: julia-actions/julia-buildpkg@v1
+        with:
+          project: ${{ inputs.project }}
+      - uses: julia-actions/julia-runtest@v1
+        with:
+          project: ${{ inputs.project }}
+          coverage: 'false'
+
+  qa:
+    name: QA
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: write
+      contents: read
+    env:
+      GROUP: QA
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1'
+          arch: x64
+      - uses: julia-actions/cache@v3
+      - uses: julia-actions/julia-buildpkg@v1
+        with:
+          project: ${{ inputs.project }}
+      - uses: julia-actions/julia-runtest@v1
+        with:
+          project: ${{ inputs.project }}
+          coverage: 'false'
+
+  downgrade:
+    # Direct dependencies at the lowest versions [compat] allows. Weak dependencies are left
+    # alone (mode deps): their extensions do not load in Core, and flooring them would install
+    # packages such as CUDA for nothing.
+    name: Core - lowest compat
+    if: inputs.registered && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: write
+      contents: read
+    env:
+      GROUP: Core
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1'
+          arch: x64
+      - uses: julia-actions/cache@v3
+      - uses: julia-actions/julia-downgrade-compat@v2
+        with:
+          projects: ${{ inputs.project }}
+          mode: deps
+      - uses: julia-actions/julia-buildpkg@v1
+        with:
+          project: ${{ inputs.project }}
+      - uses: julia-actions/julia-runtest@v1
+        with:
+          project: ${{ inputs.project }}
+          coverage: 'false'
+          allow_reresolve: false
+          force_latest_compatible_version: false
+
+  pre:
+    # Monthly look at the next Julia release; allowed to fail, reported by admiral's sweep.
+    name: Core - Julia pre
+    if: inputs.registered && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    permissions:
+      actions: write
+      contents: read
+    env:
+      GROUP: Core
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: pre
+          arch: x64
+      - uses: julia-actions/cache@v3
+      - uses: julia-actions/julia-buildpkg@v1
+        with:
+          project: ${{ inputs.project }}
+      - uses: julia-actions/julia-runtest@v1
+        with:
+          project: ${{ inputs.project }}
+          coverage: 'false'
+
+  format:
+    name: Runic
+    if: inputs.runic && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1'
+          arch: x64
+      - uses: julia-actions/cache@v3
+        with:
+          delete-old-caches: 'false'  # needs actions: write, which this job does not get
+      - uses: fredrikekre/runic-action@v1
+        with:
+          version: '1'

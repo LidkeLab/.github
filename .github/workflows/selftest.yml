@@ -1,0 +1,23 @@
+# Self-test: runs julia-ci.yml from this commit against the fixture package. registered is on
+# so the downgrade job runs too; the pre job runs only on schedule and the Runic job stays off
+# (the copied lab template files are not Runic-formatted).
+name: Self-test
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  fixture:
+    uses: ./.github/workflows/julia-ci.yml
+    with:
+      project: test/fixture/FixturePkg
+      registered: true

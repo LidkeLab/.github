@@ -1,0 +1,30 @@
+# Lab CI caller (admiral decision 0011). Copy to .github/workflows/CI.yml unchanged except the
+# `with:` lines; the rest is checked by hash. The jobs live in LidkeLab/.github.
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['*']
+    paths-ignore: ['**.md', 'dev/**', '.claude/**']
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore: ['**.md', 'dev/**', '.claude/**']
+  workflow_dispatch:
+  schedule:
+    - cron: '23 5 1 * *'  # monthly
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  actions: write  # the cache step deletes the caches it replaces
+  contents: read
+
+jobs:
+  ci:
+    uses: LidkeLab/.github/.github/workflows/julia-ci.yml@v1
+    with:
+      registered: false
+      runic: false

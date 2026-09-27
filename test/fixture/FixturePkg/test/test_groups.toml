@@ -1,0 +1,5 @@
+# Test groups (admiral decision 0008). The fixture declares Core and QA only.
+
+[Core]
+
+[QA]
