@@ -48,6 +48,8 @@ The caller runs on pull requests (including when a draft is marked ready) and on
 dispatch, never on a push or a schedule (admiral decision 0025: the lab tests on its own machines,
 and a pull request gets one confirming CI run). Changes only to Markdown files, `dev/` or
 `.claude/` do not start a pull-request run. A newer push to a pull request cancels the older run.
+Only the default branch saves a Julia cache, so a cache is seeded only by a manual
+`workflow_dispatch` run on `main`; until then, pull-request runs start cold.
 
 ## Versions
 
