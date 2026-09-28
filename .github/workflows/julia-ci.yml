@@ -29,18 +29,19 @@ env:
   # mix AMD EPYC 7763, 9V74 and Intel Xeon 8370C, 8573C, and a job landing on an incompatible
   # one rejects the cache ("different system or CPU target") and rebuilds every dependency.
   JULIA_CPU_TARGET: 'generic;sandybridge,-xsaveopt,clone_all;haswell,-rdrnd,base(1);x86-64-v4,-rdrnd,base(1)'
-  # Only the default branch saves Julia caches; PR and other branch runs restore the default
-  # branch's cache and save nothing, so they cannot evict it from the 10 GB repository budget.
-  # Scheduled runs always run on the default branch, but their event carries no repository.
-  # A private repository runs no push event, so only a manual dispatch on main seeds its cache.
-  JULIA_CACHE_SAVE: ${{ github.event_name == 'schedule' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+  # In a public repository only the default branch saves Julia caches; PR and other branch runs
+  # restore the default branch's cache and save nothing, so they cannot evict it from the 10 GB
+  # repository budget. Scheduled runs always run on the default branch, but their event carries
+  # no repository. A private repository runs no push event, so every one of its runs saves.
+  JULIA_CACHE_SAVE: ${{ github.event_name == 'schedule' || github.event.repository.private || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
 
 jobs:
   # Admiral decision 0025: a public repository, whose Actions minutes are free, runs on every event
   # its caller sends. A private one runs only on pull requests and manual dispatch, at Julia 1
-  # only: its push and scheduled events skip every job. Push, pull request and dispatch events
-  # carry github.event.repository.private; a scheduled event carries no repository, so the
-  # visibility job looks it up, on scheduled runs only.
+  # only; every other event skips every job. The conditions list what may run, so an event a
+  # caller adds later is covered. Most events carry github.event.repository.private; a scheduled
+  # event carries no repository, so the visibility job looks it up, on scheduled runs only. Never
+  # test private == false: on an event with no repository, null == false is true.
   visibility:
     name: Visibility
     if: github.event_name == 'schedule'
@@ -64,8 +65,9 @@ jobs:
     if: >-
       !cancelled()
       && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
-      && (github.event_name != 'push' || !github.event.repository.private)
-      && (github.event_name != 'schedule' || needs.visibility.outputs.public == 'true')
+      && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+          || (github.event.repository && !github.event.repository.private)
+          || needs.visibility.outputs.public == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 60  # a cold portable-target build of a large package runs ~30 min
     permissions:
@@ -106,8 +108,9 @@ jobs:
     if: >-
       !cancelled()
       && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
-      && (github.event_name != 'push' || !github.event.repository.private)
-      && (github.event_name != 'schedule' || needs.visibility.outputs.public == 'true')
+      && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+          || (github.event.repository && !github.event.repository.private)
+          || needs.visibility.outputs.public == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 60  # a cold portable-target build of a large package runs ~30 min
     permissions:
@@ -146,9 +149,9 @@ jobs:
     if: >-
       !cancelled()
       && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
-      && (github.event_name != 'push' || !github.event.repository.private)
-      && (github.event_name != 'schedule' || needs.visibility.outputs.public == 'true')
-      && inputs.registered && !github.event.repository.private
+      && ((github.event.repository && !github.event.repository.private)
+          || needs.visibility.outputs.public == 'true')
+      && inputs.registered
     runs-on: ubuntu-latest
     timeout-minutes: 60  # a cold portable-target build of a large package runs ~30 min
     permissions:
@@ -226,12 +229,14 @@ jobs:
     if: >-
       !cancelled()
       && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
-      && (github.event_name != 'push' || !github.event.repository.private)
-      && (github.event_name != 'schedule' || needs.visibility.outputs.public == 'true')
+      && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+          || (github.event.repository && !github.event.repository.private)
+          || needs.visibility.outputs.public == 'true')
       && inputs.runic
     runs-on: ubuntu-latest
     timeout-minutes: 60  # a cold portable-target build of a large package runs ~30 min
     permissions:
+      actions: write  # private PR runs save, and the cache step deletes the caches they replace
       contents: read
     steps:
       - uses: actions/checkout@v7
@@ -246,9 +251,6 @@ jobs:
           cache-name: julia-cache;workflow=${{ github.workflow }};job=${{ github.job }};cpu=portable
           save-always: ${{ env.JULIA_CACHE_SAVE }}
           _job-status: ${{ env.JULIA_CACHE_SAVE == 'true' && job.status || 'not-saved-off-default-branch' }}
-          # Off the default branch nothing is saved (JULIA_CACHE_SAVE); on it, julia-actions/cache
-          # never deletes old caches, so deletion would need actions: write for nothing.
-          delete-old-caches: 'false'
       - uses: fredrikekre/runic-action@v1
         with:
           version: '1'

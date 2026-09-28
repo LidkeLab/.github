@@ -50,10 +50,14 @@ draft is marked ready), on manual dispatch, and monthly. Changes only to Markdow
 or `.claude/` do not start a run. A newer push to a pull request cancels the older run.
 
 In a private repository, whose Actions minutes are paid, the jobs run only on pull requests and
-manual dispatch, and skip push and scheduled events (admiral decision 0025: the lab tests on its
-own machines, and its local record checks the Julia floor). Only the default branch saves a Julia
-cache, so a private repository's cache is seeded only by a manual `workflow_dispatch` run on
-`main`; until then its pull-request runs start cold. Public repositories run on every event.
+manual dispatch and skip every other event (admiral decision 0025: the lab tests on its own
+machines, and its local record checks the Julia floor). Public repositories run on every event.
+
+A public repository saves its Julia cache only from the default branch, and pull requests restore
+that cache. A private repository has no push runs, so every one of its runs saves: later runs on
+the same pull request start warm, and a new pull request restores only the default branch's
+cache, which a manual `workflow_dispatch` run on `main` seeds. GitHub drops a cache unused for 7
+days, so the first run after a quiet week starts cold.
 
 ## Versions
 
