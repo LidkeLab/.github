@@ -15,9 +15,10 @@ that need a GPU, lab data, long run times or an instrument run on a lab machine 
 
 | Job | When | What |
 |---|---|---|
-| `test` | always | `GROUP=Core` tests at Julia `min` (the `julia` compat lower bound) and `1` |
+| `test` | always | `GROUP=Core` tests at Julia `min` (the `julia` compat lower bound) and `1`; a private repository runs `1` only |
 | `qa` | always | `GROUP=QA` tests (Aqua, ExplicitImports) at Julia `1` |
-| `downgrade` | `registered: true` | `GROUP=Core` at Julia `min`, the oldest supported Julia, with direct dependencies at the lowest versions `[compat]` allows |
+| `downgrade` | `registered: true`, public repositories | `GROUP=Core` at Julia `min`, the oldest supported Julia, with direct dependencies at the lowest versions `[compat]` allows |
+| `pre` | `registered: true`, public repositories, scheduled runs only | `GROUP=Core` at the Julia prerelease; allowed to fail |
 | `format` | `runic: true` | Runic formatting check |
 
 All jobs run on ubuntu-latest, x64, with a 60-minute timeout, and skip draft pull requests. There
@@ -28,7 +29,7 @@ is no coverage upload and no docs job. The `GROUP` variable is read by the lab's
 
 | Input | Type | Default | Meaning |
 |---|---|---|---|
-| `registered` | boolean | `false` | The package is in the General registry: adds `downgrade`. |
+| `registered` | boolean | `false` | The package is in the General registry: adds `downgrade` and the monthly `pre` run, in a public repository. |
 | `runic` | boolean | `false` | Adds the Runic formatting check. Runic checks every `.jl` file in the repository. |
 | `project` | string | `.` | Path to the package within the repository. |
 
@@ -44,12 +45,15 @@ is no coverage upload and no docs job. The `GROUP` variable is read by the lab's
 4. The package's tests must follow the lab's test layout: the standard `test/runtests.jl`, a
    `test/test_groups.toml`, and at least the `Core` and `QA` groups.
 
-The caller runs on pull requests (including when a draft is marked ready) and on manual
-dispatch, never on a push or a schedule (admiral decision 0025: the lab tests on its own machines,
-and a pull request gets one confirming CI run). Changes only to Markdown files, `dev/` or
-`.claude/` do not start a pull-request run. A newer push to a pull request cancels the older run.
-Only the default branch saves a Julia cache, so a cache is seeded only by a manual
-`workflow_dispatch` run on `main`; until then, pull-request runs start cold.
+The caller runs on pushes to `main` or `master` and on tags, on pull requests (including when a
+draft is marked ready), on manual dispatch, and monthly. Changes only to Markdown files, `dev/`
+or `.claude/` do not start a run. A newer push to a pull request cancels the older run.
+
+In a private repository, whose Actions minutes are paid, the jobs run only on pull requests and
+manual dispatch, and skip push and scheduled events (admiral decision 0025: the lab tests on its
+own machines, and its local record checks the Julia floor). Only the default branch saves a Julia
+cache, so a private repository's cache is seeded only by a manual `workflow_dispatch` run on
+`main`; until then its pull-request runs start cold. Public repositories run on every event.
 
 ## Versions
 
@@ -61,5 +65,5 @@ move to it by editing their caller.
 ## Self-test
 
 `.github/workflows/selftest.yml` runs the workflow from the same commit, with `registered` and
-`runic` on, against a small fixture package in `test/fixture/FixturePkg`, on pull requests and
-manual dispatch.
+`runic` on, against a small fixture package in `test/fixture/FixturePkg`, on every push and pull
+request.
