@@ -18,7 +18,7 @@ that need a GPU, lab data, long run times or an instrument run on a lab machine 
 | `test` | always | `GROUP=Core` tests at Julia `min` (the `julia` compat lower bound) and `1` |
 | `qa` | always | `GROUP=QA` tests (Aqua, ExplicitImports) at Julia `1` |
 | `downgrade` | `registered: true` | `GROUP=Core` at Julia `min`, the oldest supported Julia, with direct dependencies at the lowest versions `[compat]` allows |
-| `pre` | `registered: true`, scheduled runs only | `GROUP=Core` at the Julia prerelease; allowed to fail |
+| `pre` | `registered: true`, scheduled runs only (the lab caller has no schedule) | `GROUP=Core` at the Julia prerelease; allowed to fail |
 | `format` | `runic: true` | Runic formatting check |
 
 All jobs run on ubuntu-latest, x64, with a 30-minute timeout, and skip draft pull requests. There
@@ -29,7 +29,7 @@ is no coverage upload and no docs job. The `GROUP` variable is read by the lab's
 
 | Input | Type | Default | Meaning |
 |---|---|---|---|
-| `registered` | boolean | `false` | The package is in the General registry: adds `downgrade` and the monthly `pre` run. |
+| `registered` | boolean | `false` | The package is in the General registry: adds `downgrade`, and `pre` on scheduled runs. |
 | `runic` | boolean | `false` | Adds the Runic formatting check. Runic checks every `.jl` file in the repository. |
 | `project` | string | `.` | Path to the package within the repository. |
 
@@ -45,9 +45,10 @@ is no coverage upload and no docs job. The `GROUP` variable is read by the lab's
 4. The package's tests must follow the lab's test layout: the standard `test/runtests.jl`, a
    `test/test_groups.toml`, and at least the `Core` and `QA` groups.
 
-The caller runs on pushes to `main` or `master` and on tags, on pull requests (including when a
-draft is marked ready), on manual dispatch, and monthly. Changes only to Markdown files, `dev/`
-or `.claude/` do not start a run. A newer push to a pull request cancels the older run.
+The caller runs on pull requests (including when a draft is marked ready) and on manual
+dispatch, never on a push or a schedule (admiral decision 0025: the lab tests on its own machines,
+and a pull request gets one confirming CI run). Changes only to Markdown files, `dev/` or
+`.claude/` do not start a pull-request run. A newer push to a pull request cancels the older run.
 
 ## Versions
 
