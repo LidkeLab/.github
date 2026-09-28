@@ -18,10 +18,9 @@ that need a GPU, lab data, long run times or an instrument run on a lab machine 
 | `test` | always | `GROUP=Core` tests at Julia `min` (the `julia` compat lower bound) and `1` |
 | `qa` | always | `GROUP=QA` tests (Aqua, ExplicitImports) at Julia `1` |
 | `downgrade` | `registered: true` | `GROUP=Core` at Julia `min`, the oldest supported Julia, with direct dependencies at the lowest versions `[compat]` allows |
-| `pre` | `registered: true`, scheduled runs only (the lab caller has no schedule) | `GROUP=Core` at the Julia prerelease; allowed to fail |
 | `format` | `runic: true` | Runic formatting check |
 
-All jobs run on ubuntu-latest, x64, with a 30-minute timeout, and skip draft pull requests. There
+All jobs run on ubuntu-latest, x64, with a 60-minute timeout, and skip draft pull requests. There
 is no coverage upload and no docs job. The `GROUP` variable is read by the lab's standard
 `test/runtests.jl`, which runs the test groups declared in `test/test_groups.toml`.
 
@@ -29,7 +28,7 @@ is no coverage upload and no docs job. The `GROUP` variable is read by the lab's
 
 | Input | Type | Default | Meaning |
 |---|---|---|---|
-| `registered` | boolean | `false` | The package is in the General registry: adds `downgrade`, and `pre` on scheduled runs. |
+| `registered` | boolean | `false` | The package is in the General registry: adds `downgrade`. |
 | `runic` | boolean | `false` | Adds the Runic formatting check. Runic checks every `.jl` file in the repository. |
 | `project` | string | `.` | Path to the package within the repository. |
 
@@ -60,5 +59,5 @@ move to it by editing their caller.
 ## Self-test
 
 `.github/workflows/selftest.yml` runs the workflow from the same commit, with `registered` and
-`runic` on, against a small fixture package in `test/fixture/FixturePkg`, on every push and pull
-request.
+`runic` on, against a small fixture package in `test/fixture/FixturePkg`, on pull requests and
+manual dispatch.

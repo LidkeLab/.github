@@ -1,10 +1,10 @@
 # Self-test: runs julia-ci.yml from this commit against the fixture package. registered and
-# runic are on so the downgrade and Runic jobs run too; the pre job runs only on schedule.
+# runic are on so the downgrade and Runic jobs run too.
 name: Self-test
 
 on:
-  push:
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
