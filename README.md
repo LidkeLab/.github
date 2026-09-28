@@ -15,13 +15,13 @@ that need a GPU, lab data, long run times or an instrument run on a lab machine 
 
 | Job | When | What |
 |---|---|---|
-| `test` | always | `GROUP=Core` tests at Julia `min` (the `julia` compat lower bound) and `1` |
+| `test` | always | `GROUP=Core` tests at Julia `min` (the `julia` compat lower bound) and `1`; a private repository runs `1` only |
 | `qa` | always | `GROUP=QA` tests (Aqua, ExplicitImports) at Julia `1` |
-| `downgrade` | `registered: true` | `GROUP=Core` at Julia `min`, the oldest supported Julia, with direct dependencies at the lowest versions `[compat]` allows |
-| `pre` | `registered: true`, scheduled runs only | `GROUP=Core` at the Julia prerelease; allowed to fail |
+| `downgrade` | `registered: true`, public repositories | `GROUP=Core` at Julia `min`, the oldest supported Julia, with direct dependencies at the lowest versions `[compat]` allows |
+| `pre` | `registered: true`, public repositories, scheduled runs only | `GROUP=Core` at the Julia prerelease; allowed to fail |
 | `format` | `runic: true` | Runic formatting check |
 
-All jobs run on ubuntu-latest, x64, with a 30-minute timeout, and skip draft pull requests. There
+All jobs run on ubuntu-latest, x64, with a 60-minute timeout, and skip draft pull requests. There
 is no coverage upload and no docs job. The `GROUP` variable is read by the lab's standard
 `test/runtests.jl`, which runs the test groups declared in `test/test_groups.toml`.
 
@@ -29,7 +29,7 @@ is no coverage upload and no docs job. The `GROUP` variable is read by the lab's
 
 | Input | Type | Default | Meaning |
 |---|---|---|---|
-| `registered` | boolean | `false` | The package is in the General registry: adds `downgrade` and the monthly `pre` run. |
+| `registered` | boolean | `false` | The package is in the General registry: adds `downgrade` and the monthly `pre` run, in a public repository. |
 | `runic` | boolean | `false` | Adds the Runic formatting check. Runic checks every `.jl` file in the repository. |
 | `project` | string | `.` | Path to the package within the repository. |
 
@@ -48,6 +48,16 @@ is no coverage upload and no docs job. The `GROUP` variable is read by the lab's
 The caller runs on pushes to `main` or `master` and on tags, on pull requests (including when a
 draft is marked ready), on manual dispatch, and monthly. Changes only to Markdown files, `dev/`
 or `.claude/` do not start a run. A newer push to a pull request cancels the older run.
+
+In a private repository, whose Actions minutes are paid, the jobs run only on pull requests and
+manual dispatch and skip every other event (admiral decision 0025: the lab tests on its own
+machines, and its local record checks the Julia floor). Public repositories run on every event.
+
+A public repository saves its Julia cache only from the default branch, and pull requests restore
+that cache. A private repository has no push runs, so every one of its runs saves: later runs on
+the same pull request start warm, and a new pull request restores only the default branch's
+cache, which a manual `workflow_dispatch` run on `main` seeds. GitHub drops a cache unused for 7
+days, so the first run after a quiet week starts cold.
 
 ## Versions
 
