@@ -1,5 +1,7 @@
-# Self-test: runs julia-ci.yml from this commit against the fixture package. registered and
-# runic are on so the downgrade and Runic jobs run too; the pre job runs only on schedule.
+# Self-test: runs julia-ci.yml from this commit against the fixture package, twice: as the public
+# repository this is, and with assume-private, which runs what a private repository would run.
+# registered and runic are on so the downgrade and Runic jobs run too; the pre job runs only on
+# schedule. The last job checks that exactly the expected jobs ran for the event.
 name: Self-test
 
 on:
@@ -23,3 +25,56 @@ jobs:
       project: test/fixture/FixturePkg
       registered: true
       runic: true
+
+  private:
+    uses: ./.github/workflows/julia-ci.yml
+    with:
+      project: test/fixture/FixturePkg
+      registered: true
+      runic: true
+      assume-private: true
+
+  expected:
+    # The rule is written out here a second time, from the event as this caller sees it, and
+    # compared with the jobs that ran. A job that ran and failed also fails the comparison.
+    name: Expected jobs ran
+    needs: [fixture, private]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          export LC_ALL=C
+          public=true
+          private=false
+          case "$EVENT" in
+            workflow_dispatch) private=true ;;
+            pull_request)
+              if [ "$DRAFT" = true ]; then
+                public=false
+              else
+                case "$ACTION" in opened|reopened|ready_for_review) private=true ;; esac
+              fi ;;
+          esac
+          {
+            if [ "$public" = true ]; then
+              printf 'fixture / %s=success\n' 'Core - Julia 1' 'Core - Julia min' 'Core - lowest compat' 'QA' 'Runic'
+            fi
+            if [ "$private" = true ]; then
+              printf 'private / %s=success\n' 'Core - Julia 1' 'QA' 'Runic'
+            fi
+          } | sort > expected.txt
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" \
+            --jq '.jobs[] | select(.conclusion != null and .conclusion != "skipped") | "\(.name)=\(.conclusion)"' \
+            | sort > ran.txt
+          echo "event=$EVENT action=$ACTION draft=$DRAFT"
+          echo "Jobs that ran:"
+          cat ran.txt
+          diff expected.txt ran.txt && echo "As expected."
