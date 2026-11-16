@@ -32,6 +32,7 @@ is no coverage upload and no docs job. The `GROUP` variable is read by the lab's
 | `registered` | boolean | `false` | The package is in the General registry: adds `downgrade` and the monthly `pre` run, in a public repository. |
 | `runic` | boolean | `false` | Adds the Runic formatting check. Runic checks every `.jl` file in the repository. |
 | `project` | string | `.` | Path to the package within the repository. |
+| `assume-private` | boolean | `false` | Runs only the jobs a private repository runs (below), whatever the repository's visibility. The self-test uses it. |
 
 ## Adopting it in a package
 
@@ -49,15 +50,20 @@ The caller runs on pushes to `main` or `master` and on tags, on pull requests (i
 draft is marked ready), on manual dispatch, and monthly. Changes only to Markdown files, `dev/`
 or `.claude/` do not start a run. A newer push to a pull request cancels the older run.
 
-In a private repository, whose Actions minutes are paid, the jobs run only on pull requests and
-manual dispatch and skip every other event (admiral decision 0025: the lab tests on its own
-machines, and its local record checks the Julia floor). Public repositories run on every event.
+In a private repository, whose Actions minutes are paid, the jobs run once per pull request, when
+it becomes ready for review: when it is opened or reopened and is not a draft, or when a draft is
+marked ready. They also run on manual dispatch. Every other event skips every job, including a
+later push to the pull request, a push to `main` and the monthly schedule (admiral decision 0025:
+the lab tests on its own machines, and its local record checks the Julia floor).
+To test a later commit on GitHub, start the `CI` workflow by hand on the branch: the Actions tab,
+or `gh workflow run CI.yml --ref <branch>`. A push while the one run is still going cancels it,
+as in any repository, and no run replaces it. Public repositories run on every event.
 
 A public repository saves its Julia cache only from the default branch, and pull requests restore
-that cache. A private repository has no push runs, so every one of its runs saves: later runs on
-the same pull request start warm, and a new pull request restores only the default branch's
-cache, which a manual `workflow_dispatch` run on `main` seeds. GitHub drops a cache unused for 7
-days, so the first run after a quiet week starts cold.
+that cache. A private repository has no push runs, so every one of its runs saves: a pull request
+restores the default branch's cache, which a manual `workflow_dispatch` run on `main` seeds, and a
+run started by hand on a branch restores that branch's last cache. GitHub drops a cache unused
+for 7 days, so the first run after a quiet week starts cold.
 
 ## Versions
 
@@ -70,4 +76,6 @@ move to it by editing their caller.
 
 `.github/workflows/selftest.yml` runs the workflow from the same commit, with `registered` and
 `runic` on, against a small fixture package in `test/fixture/FixturePkg`, on every push and pull
-request.
+request. It runs it twice, as the public repository this is and with `assume-private`, and its
+last job fails unless exactly the jobs expected for the event ran: for a push, the public set and
+none of the private set; for a pull request marked ready, both.
